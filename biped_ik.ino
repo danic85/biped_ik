@@ -6,6 +6,7 @@
  */
 
 #include <Arduino.h>
+#include "inverse_kinematics.h"
 
 #define MAX_EASING_SERVOS 9
 #include "ServoEasing.hpp"
@@ -47,6 +48,8 @@ void blinkLED();
 
 uint16_t tSpeed;
 
+InverseKinematics ik(PosMin[3], PosMax[3], PosMin[4], PosMax[4], PosMin[5], PosMax[5], 94.0, 94.0, 28.0);
+
 void setup()
 {
     pinMode(LED_BUILTIN, OUTPUT);
@@ -82,162 +85,54 @@ void setup()
     Serial.println("Test 2d Inverse Kinematics");
 }
 
-long moveRandom(int index)
-{
-    return random(PosMin[index], PosMax[index]);
-}
-
-// Quick conversion from the Braccio angle system to radians
-float b2a(float b)
-{
-    return b / 180.0 * PI - HALF_PI;
-}
-
-// Quick conversion from radians to the Braccio angle system
-float a2b(float a)
-{
-    return (a + HALF_PI) * 180 / PI;
-}
-
-float r2d(float rad)
-{
-  return (rad * 180 / PI);
-}
-
-float d2r(float deg)
-{
-  return (deg * PI / 180);
-}
-
-// calculate inverse kinematics for a leg with 3 degrees of freedom along a 2d plane
-boolean inverseKinematics2D(float x, float y, float &hipAngle, float &kneeAngle, float &ankleAngle)
-{
-    float L1 = 94.0; // hip to knee
-    float L2 = 94.0; // knee to ankle
-    float L3 = 28.0; // ankle to foot
-
-    float hipMinAngle = 20.0; // PosMin[3]
-    float hipMaxAngle = 160.0;  // PosMax[3]
-
-    float kneeMinAngle = 5.0; // PosMin[4]
-    float kneeMaxAngle = 175.0; // PosMax[4]
-
-    float ankleMinAngle = 40.0; // PosMin[5]
-    float ankleMaxAngle = 180.0; // PosMax[5]
-
-    float a = L1;
-    float b = L2;
-    float c = x;
-    // Law of cosines to sides A+ B
-    //γ = acos((a² + b² − c²)/(2ab))
-    float hip = acos((sq(a) + sq(c) - sq(b)) / (2*a*c));
-    // Law of cosines to sides A+ B
-    float knee = PI - (hip * 2) ;//acos((sq(a) + sq(b) - sq(c)) / (2*a*c));
-    // compute remaining angle
-    float ankle = d2r(180) - knee - hip;
-
-    Serial.print(hip);
-    Serial.print(" + ");
-    Serial.print(knee);
-    Serial.print(" + ");
-    Serial.print(ankle);
-    Serial.print(" = ");
-    Serial.println(hip + knee + ankle);
-
-    Serial.print(r2d(hip));
-    Serial.print(" - ");
-    Serial.print(r2d(knee));
-    Serial.print(" - ");
-    Serial.println(r2d(ankle));
-    Serial.println(" = ");
-    Serial.println(r2d(hip + knee + ankle));
-
-    // return false if angles are not numbers
-    if (isnan(hip) || isnan(knee) || isnan(ankle))
-    {
-        return false;
-    }
-
-    float rad90 = d2r(90);
-    float rad180 = d2r(180);
-    float rad60 = d2r(60);
-
-    // Convert the angles to the Braccio angle system
-    hipAngle = r2d(rad180 - (hip + d2r(110))); // Inverse and offset
-    kneeAngle = r2d(knee - rad90); // Offset 90 to compensate
-    ankleAngle = r2d(ankle + rad60); // Offset 60 to compensate
-
-    Serial.print(hipAngle);
-    Serial.print(" - ");
-    Serial.print(kneeAngle);
-    Serial.print(" - ");
-    Serial.println(ankleAngle);
-
-    // Check if the angles are within the limits
-    if (hipAngle < hipMinAngle || hipAngle > hipMaxAngle || kneeAngle < kneeMinAngle || kneeAngle > kneeMaxAngle || ankleAngle < ankleMinAngle || ankleAngle > ankleMaxAngle)
-    {
-        return false;
-    }
-
-    return true;
-
-}
-
-void calculateOtherLeg(float lHip, float lKnee, float lAnkle, float &rHip, float &rKnee, float &rAnkle)
-{
-    rHip = 180 - lHip;
-    rKnee = 180 - lKnee;
-    rAnkle = 180 - lAnkle;
-}
-
 void test2dInverseK()
 {
     
     float hipAngleL, kneeAngleL, ankleAngleL, hipAngleR, kneeAngleR, ankleAngleR;
     int thisMove[MAX_EASING_SERVOS] = {90, 90, 90, 90, 90, 90, 90, 90, 90};
 
-    int y = 0;
-    // Iterate over all X and Y positions between 0 and 200 and move the leg to that position
-    //for (int y = 0; y < 200; y += 10)
-    //{
-        for (int x = 140; x <= 180; x += 40)
+    int y = 0; // Coming soon
+    // Iterate through valid X values (leg height between joint in ankle and joint in hip)
+    for (int x = 140; x <= 180; x += 40)
+    {
+        // Solve inverse kinematics for left leg
+        if (!ik.inverseKinematics2D(x, y, hipAngleL, kneeAngleL, ankleAngleL)) 
         {
-            if (!inverseKinematics2D(x, y, hipAngleL, kneeAngleL, ankleAngleL)) 
-            {
-                Serial.println("No solution");
-                continue;
-            }
-
-            // Assume that other leg is identical but mirrored
-            calculateOtherLeg(hipAngleL, kneeAngleL, ankleAngleL, hipAngleR, kneeAngleR, ankleAngleR);
-
-            Serial.print("X: ");
-            Serial.print(x);
-            Serial.print(" Y: ");
-            Serial.println(y);
-            Serial.print(" - L Hip: ");
-            Serial.print(hipAngleL);
-            Serial.print(" Knee: ");
-            Serial.print(kneeAngleL);
-            Serial.print(" Ankle: ");
-            Serial.println(ankleAngleL);
-            Serial.print(" - R Hip: ");
-            Serial.print(hipAngleR);
-            Serial.print(" Knee: ");
-            Serial.print(kneeAngleR);
-            Serial.print(" Ankle: ");
-            Serial.println(ankleAngleR);
-
-            thisMove[0] = hipAngleR;
-            thisMove[1] = kneeAngleR;
-            thisMove[2] = ankleAngleR;
-            thisMove[3] = hipAngleL;
-            thisMove[4] = kneeAngleL;
-            thisMove[5] = ankleAngleL;
-            moveServos(thisMove);
-            //delay(2000);
+            Serial.println("No solution");
+            continue;
         }
-    //}
+
+        // Solve right leg, assuming identical but mirrored
+        ik.calculateOtherLeg(hipAngleL, kneeAngleL, ankleAngleL, hipAngleR, kneeAngleR, ankleAngleR);
+
+        #ifdef IK_DEBUG
+        Serial.print("X: ");
+        Serial.print(x);
+        Serial.print(" Y: ");
+        Serial.println(y);
+        Serial.print(" - L Hip: ");
+        Serial.print(hipAngleL);
+        Serial.print(" Knee: ");
+        Serial.print(kneeAngleL);
+        Serial.print(" Ankle: ");
+        Serial.println(ankleAngleL);
+        Serial.print(" - R Hip: ");
+        Serial.print(hipAngleR);
+        Serial.print(" Knee: ");
+        Serial.print(kneeAngleR);
+        Serial.print(" Ankle: ");
+        Serial.println(ankleAngleR);
+        #endif
+
+        // Define new positions and move servos
+        thisMove[0] = hipAngleR;
+        thisMove[1] = kneeAngleR;
+        thisMove[2] = ankleAngleR;
+        thisMove[3] = hipAngleL;
+        thisMove[4] = kneeAngleL;
+        thisMove[5] = ankleAngleL;
+        moveServos(thisMove);
+    }
     delay(1000);
 }
 
@@ -264,6 +159,11 @@ void moveServos(int *Pos)
     {
         blinkLED();
     }
+}
+
+long moveRandom(int index)
+{
+    return random(PosMin[index], PosMax[index]);
 }
 
 

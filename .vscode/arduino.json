@@ -2,6 +2,6 @@
     "configuration": "cpu=atmega328",
     "board": "arduino:avr:nano",
     "programmer": "avrispmkii",
-    "sketch": "ik_test.ino",
+    "sketch": "biped_ik.ino",
     "port": "/dev/ttyUSB0"
 }
