@@ -96,14 +96,14 @@ void test2dInverseK()
     for (int x = 140; x <= 180; x += 40)
     {
         // Solve inverse kinematics for left leg
-        if (!ik.inverseKinematics2D(x, y, hipAngleL, kneeAngleL, ankleAngleL)) 
+        if (!ik.inverseKinematics2D(x, y, hipAngleR, kneeAngleR, ankleAngleR)) 
         {
             Serial.println("No solution");
             continue;
         }
 
         // Solve right leg, assuming identical but mirrored
-        ik.calculateOtherLeg(hipAngleL, kneeAngleL, ankleAngleL, hipAngleR, kneeAngleR, ankleAngleR);
+        ik.calculateOtherLeg(hipAngleR, kneeAngleR, ankleAngleR, hipAngleL, kneeAngleL, ankleAngleL);
 
         #ifdef IK_DEBUG
         Serial.print("X: ");
